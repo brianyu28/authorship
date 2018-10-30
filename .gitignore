@@ -1,0 +1,5 @@
+.vscode/*
+.DS_Store
+data/*/results
+data/*/segments
+data/*/separations

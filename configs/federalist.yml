@@ -1,0 +1,57 @@
+configuration:
+  model: "NB"
+  src: data/federalist
+  repetitions: 1
+  skip:
+    - preprocessing
+    - separation
+  clean:
+    - results
+    # - separations
+    # - segments
+
+authors:
+  Alexander Hamilton: hamilton
+  James Madison: madison
+  Unknown: disputed
+
+segmenters:
+  - src: corpus/*hamilton*.txt
+    author: Alexander Hamilton
+    size: 20
+  - src: corpus/*madison*.txt
+    author: James Madison
+    size: 20
+  - src: corpus/*disputed*.txt
+    author: Unknown
+    preserve: true
+
+preprocessors:
+  - text
+  - pos
+
+separations:
+  - author: Alexander Hamilton
+    holdout: 0
+  - author: James Madison
+    holdout: 0
+  - author: Unknown
+    holdout: 1
+
+features:
+  - name: word_length
+  - name: sentence_length
+  - name: ngram
+    length: 3
+    type: text
+    threshold: 30
+  - name: ngram
+    length: 2
+    type: text
+    threshold: 30
+  - name: ngram
+    length: 1
+    type: text
+    threshold: 30
+  - name: word_frequency
+    filename: resources/function_words.txt

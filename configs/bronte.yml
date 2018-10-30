@@ -1,0 +1,55 @@
+configuration:
+  model: "NB"
+  src: data/bronte
+  repetitions: 1
+  # skip:
+    # - preprocessing
+  clean:
+    - results
+    - separations
+    - segments
+
+authors:
+  Anne Bronte: anne
+  Charlotte Bronte: charlotte
+  Emily Bronte: emily
+
+segmenters:
+  - src: corpus/Anne*.txt
+    author: Anne Bronte
+    size: 20
+  - src: corpus/Charlotte*.txt
+    author: Charlotte Bronte
+    size: 20
+  - src: corpus/Emily*.txt
+    author: Emily Bronte
+    size: 20
+
+preprocessors:
+  - text
+  - pos
+
+separations:
+  - author: Anne Bronte
+    holdout: 0.2
+  - author: Charlotte Bronte
+    holdout: 0.2
+  - author: Emily Bronte
+    holdout: 0.2
+
+features:
+  - name: word_length
+  - name: ngram
+    length: 3
+    type: pos
+    threshold: 30
+  - name: ngram
+    length: 2
+    type: pos
+    threshold: 30
+  - name: ngram
+    length: 1
+    type: pos
+    threshold: 30
+  - name: word_frequency
+    filename: resources/function_words.txt
