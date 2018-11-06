@@ -68,7 +68,7 @@ class Document():
         self.contents = { preprocessor: open(os.path.join(filename, preprocessor)).read()
                           for preprocessor in os.listdir(self.filename) }
         self.vector = []
-    
+
     def get(self, preprocessor):
         return self.contents[preprocessor]
 
@@ -143,9 +143,13 @@ class Runner():
                 self.log(f"Generating segment {docname}...")
                 self.mkdir(os.path.join(dst, docname))
                 for preprocessor in self.preprocessors:
+                    filename = os.path.join(dst, docname, f"{preprocessor.name}")
+                    if os.path.exists(filename):
+                        self.log(f"  Skipping {preprocessor.name} for {docname}, already exists...")
+                        continue
                     self.log(f"  Using preprocessor {preprocessor.name} for {docname}...")
                     result = preprocessor.process(contents)
-                    f = open(os.path.join(dst, docname, f"{preprocessor.name}"), "w")
+                    f = open(filename, "w")
                     f.write(result)
                     f.close()
 
@@ -198,7 +202,7 @@ class Runner():
         self.predict()
         self.results()
 
-    def separate(self):    
+    def separate(self):
         """Create the separation of testing and training files."""
 
         self.workdir = os.path.join(self.src, "separations", str(self.current_iteration))
@@ -264,7 +268,7 @@ class Runner():
             self.log(f"Generating vectors for feature {feature.config}...")
             feature.train(self.dataset)
         data, labels = training_labels()
-        
+
         model = self.config["configuration"].get("model") or "NB"
         if model == "NB":
             clf = GaussianNB()
@@ -282,10 +286,10 @@ class Runner():
             for document in docgroup.documents:
                 prediction = self.clf.predict([document.vector])[0]
                 document.prediction = prediction
-        
+
     def results(self):
         contents = f"\n===== RESULTS {self.current_iteration} =====\n"
-        accurate, inaccurate, unknown, total = 0, 0, 0, 0 
+        accurate, inaccurate, unknown, total = 0, 0, 0, 0
         for docgroup in self.dataset.testing:
             is_unknown = docgroup.author.lower() in ["unknown", "anonymous"]
             contents += "\n" + docgroup.author + "\n"
@@ -298,7 +302,7 @@ class Runner():
                 else:
                     inaccurate += 1
                 contents += f"    {document.filename}: {document.prediction}\n"
-        
+
         # Summary
         accurate_percent = accurate * 100 / total
         inaccurate_percent = inaccurate * 100 / total
@@ -328,7 +332,7 @@ class Preprocessor():
             self.module = importlib.import_module(f"preprocessors.{name}")
         except ModuleNotFoundError:
             raise Exception(f"Could not find preprocessor {name}.")
-    
+
     def process(self, contents):
         return self.module.preprocess(contents)
 
@@ -341,7 +345,7 @@ class Feature():
             self.config = feature
         except ModuleNotFoundError:
             raise Exception(f"Could not find feature {self.name}.")
-    
+
     def train(self, dataset):
         contents = dataset.contents()
         vectors = self.module.train(self.config, contents)
