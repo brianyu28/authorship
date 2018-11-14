@@ -1,13 +1,13 @@
 configuration:
   model: "NB"
   src: data/bronte
-  repetitions: 1
-  # skip:
-    # - preprocessing
+  repetitions: 5
+  skip:
+    - preprocessing
   clean:
     - results
     - separations
-    - segments
+    # - segments
 
 authors:
   Anne Bronte: anne
@@ -26,8 +26,10 @@ segmenters:
     size: 20
 
 preprocessors:
-  - text
-  - pos
+  # - text
+  # - pos
+  # - constituency
+  - ccg
 
 separations:
   - author: Anne Bronte
@@ -39,17 +41,21 @@ separations:
 
 features:
   - name: word_length
-  - name: ngram
-    length: 3
-    type: pos
-    threshold: 30
-  - name: ngram
-    length: 2
-    type: pos
-    threshold: 30
-  - name: ngram
-    length: 1
-    type: pos
-    threshold: 30
   - name: word_frequency
     filename: resources/function_words.txt
+  - name: ngram
+    length: 5
+    type: ccg
+    threshold: 150
+  - name: ngram
+    length: 4
+    type: ccg
+    threshold: 150
+  - name: ngram
+    length: 3
+    type: ccg
+    threshold: 150
+  - name: ngram
+    length: 2
+    type: ccg
+    threshold: 150

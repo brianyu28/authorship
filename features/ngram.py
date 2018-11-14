@@ -34,7 +34,7 @@ def ngrams(text, n, ngram_type):
     if ngram_type == "text":
         words = nltk.word_tokenize(text.lower())
     else:
-        words = text.split() # for POS tagging, just split on spaces
+        words = text.split() # for POS or CCG tagging, just split on spaces
     return Counter(nltk.ngrams(words, n))
 
 def compute_vector(counter, cumulative):
