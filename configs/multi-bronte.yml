@@ -1,0 +1,25 @@
+configuration:
+  src: data/bronte
+  train: 0.8
+  clean:
+    - composite
+
+authors:
+  Anne Bronte: anne
+  Charlotte Bronte: charlotte
+  Emily Bronte: emily
+
+corpus:
+  - src: corpus/Anne*.txt
+    author: Anne Bronte
+  - src: corpus/Charlotte*.txt
+    author: Charlotte Bronte
+  - src: corpus/Emily*.txt
+    author: Emily Bronte
+
+generate:
+  n: 3
+  stay: 0.95
+  terminate: 0.01
+  threshold: 50 # sentence threshold
+
