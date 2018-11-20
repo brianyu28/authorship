@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import argparse
 import art
 import glob
+import importlib
 import math
 import nltk
 import numpy as np
@@ -12,6 +13,43 @@ import shutil
 import yaml
 
 VERBOSE = False
+
+class Dataset():
+    """
+    Maintains dataset of:
+        - Training Data [0]
+            - Authors
+                - Sentences
+        - Testing Data [1]
+            - Sample Filename
+                - Sentences
+    """
+    
+    def __init__(self):
+        pass
+    
+    def set_training(self, training):
+        self.training = training
+
+    def set_testing(self, testing):
+        self.testing = testing
+
+    def prepare(self):
+        """Prepares dataset contents for passing into features and vectors."""
+        self.contents = dict()
+        self.vectors = dict()
+        for author in self.training:
+            for i, sentence in enumerate(self.training[author]):
+                self.contents[(0, author, i)] = {"text": sentence}
+                self.vectors[(0, author, i)] = []
+        for filename in self.testing:
+            for i, sentence in enumerate(self.testing[filename]):
+                self.contents[(1, filename, i)] = {"text": sentence}
+                self.vectors[(1, filename, i)] = []
+    
+    def add_vectors(self, vectors):
+        for identifier in vectors:
+            self.vectors[identifier].extend(vectors[identifier])
 
 class Runner():
 
@@ -30,7 +68,10 @@ class Runner():
     def run_instance(self):
         self.log("Running instance...")
         self.training = dict()
+        self.sentences = None
         self.generate()
+        self.prepare_dataset()
+        self.train()
     
     def generate(self):
         self.log("Generating sample documents...")
@@ -71,17 +112,14 @@ class Runner():
 
                 action = np.random.choice(["STAY", "NEXT", "TERMINATE"],
                           p=[self.config.generate.stay, self.config.generate.next, self.config.generate.terminate])
-                print(action)
                 if action == "TERMINATE":
 
                     # Document is of sufficient length, done generating.
                     if len(document) >= self.config.generate.threshold:
-                        print("DOCUMENT IS OF SUFFICIENT LENGTH")
                         break
 
                     # Document isn't long enough, try re-generating.
                     else:
-                        print("DOCUMENT IS ONLY OF LENGTH", len(document))
                         for sentence, author in zip(document, authors):
                             sentences[author].append(sentence)
                         document = []
@@ -95,7 +133,6 @@ class Runner():
                 # Choose a random sentence by the author.
                 sentence = np.random.choice(sentences[author])
                 document.append(sentence)
-                print("Author is", author)
                 authors.append(author)
                 # sentences[author].remove(sentence)
 
@@ -111,6 +148,26 @@ class Runner():
                     f.write("\n")
             
             self.log(f"Generated document {doc_filename}...")
+        self.sentences = sentences
+
+    def prepare_dataset(self):
+        self.log("Preparing dataset...")
+
+        # Loading sentences.
+        self.dataset = Dataset()
+        self.dataset.set_training(self.training)
+        testing_files = glob.glob(os.path.join(self.config.src, "composite", "*_doc.txt"))
+        testing_data = dict()
+        for testing_file in testing_files:
+            testing_data[testing_file] = open(testing_file).read().splitlines()
+        self.dataset.set_testing(testing_data)
+        self.dataset.prepare()
+    
+    def train(self):
+        self.log("Computing vectors...")
+        for feature in self.config.features:
+            vectors = feature.train(self.dataset)
+        print(self.dataset.vectors)
 
     def mkdir(self, dirname):
         try:
@@ -132,6 +189,7 @@ class Config():
         self.corpus = self.get_corpus()
         self.authors = self.get_authors()
         self.generate = self.get_generate_prob()
+        self.features = self.get_features()
         self.clean = self.get_clean()
     
     def get_corpus(self):
@@ -155,9 +213,30 @@ class Config():
             setattr(data, feature, self.config["generate"][feature])
         data.next = 1 - data.stay - data.terminate
         return data
+    
+    def get_features(self):
+        data = []
+        for feature in self.config["features"]:
+            data.append(Feature(feature))
+        return data
 
     def get_clean(self):
         return [os.path.join(self.src, dirname) for dirname in self.config["configuration"]["clean"]]
+
+class Feature():
+
+    def __init__(self, feature):
+        try:
+            self.name = feature["name"]
+            self.module = importlib.import_module(f"features.{self.name}")
+            self.config = feature
+        except ModuleNotFoundError:
+            raise Exception(f"Could not find feature {self.name}.")
+
+    def train(self, dataset):
+        contents = dataset.contents
+        vectors = self.module.train(self.config, contents)
+        dataset.add_vectors(vectors)
 
 def main():
     config = parse_config()

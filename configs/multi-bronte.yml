@@ -23,3 +23,5 @@ generate:
   terminate: 0.01
   threshold: 50 # sentence threshold
 
+features:
+  - name: word_length
