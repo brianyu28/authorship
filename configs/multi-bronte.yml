@@ -25,3 +25,19 @@ generate:
 
 features:
   - name: word_length
+  - name: ngram
+    length: 5
+    type: text
+    threshold: 150
+  - name: ngram
+    length: 4
+    type: text
+    threshold: 150
+  - name: ngram
+    length: 3
+    type: text
+    threshold: 150
+  - name: ngram
+    length: 2
+    type: text
+    threshold: 150

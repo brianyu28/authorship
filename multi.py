@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from sklearn.naive_bayes import GaussianNB
 
 import argparse
 import art
@@ -51,6 +52,26 @@ class Dataset():
         for identifier in vectors:
             self.vectors[identifier].extend(vectors[identifier])
 
+    def training_labels(self):
+        """Returns data, labels for fitting"""
+        data = []
+        labels = []
+        for author in self.training:
+            for i, _ in enumerate(self.training[author]):
+                data.append(self.vectors[(0, author, i)])
+                labels.append(author)
+        return data, labels
+
+    def predict(self, clf):
+        self.predictions = {}
+        for filename in self.testing:
+            vectors = []
+            for i, sentence in enumerate(self.testing[filename]):
+                vectors.append(self.vectors[(1, filename, i)])
+            predictions = list(clf.predict(vectors))
+            self.predictions[filename] = predictions
+        print(self.predictions)
+
 class Runner():
 
     def __init__(self, config):
@@ -72,6 +93,7 @@ class Runner():
         self.generate()
         self.prepare_dataset()
         self.train()
+        self.predict()
     
     def generate(self):
         self.log("Generating sample documents...")
@@ -167,7 +189,14 @@ class Runner():
         self.log("Computing vectors...")
         for feature in self.config.features:
             vectors = feature.train(self.dataset)
-        print(self.dataset.vectors)
+        
+        self.log("Fitting...")
+        data, labels = self.dataset.training_labels()
+        self.clf = GaussianNB()
+        self.clf.fit(data, labels)
+
+    def predict(self):
+        self.dataset.predict(self.clf)
 
     def mkdir(self, dirname):
         try:
