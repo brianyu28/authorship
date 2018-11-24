@@ -1,6 +1,8 @@
 configuration:
   src: data/bronte
   train: 0.8
+  skip:
+    - preprocessing
   clean:
     - composite
 
@@ -22,6 +24,9 @@ generate:
   stay: 0.95
   terminate: 0.01
   threshold: 50 # sentence threshold
+
+preprocessors:
+  - text
 
 features:
   - name: word_length

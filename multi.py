@@ -84,51 +84,95 @@ class Runner():
     
     def run(self):
         self.clean()
-        self.run_instance()
+        self.preprocess()
+        self.load_sentences()
+        self.run_instance()  # loop this line multiple times if needed
     
     def run_instance(self):
         self.log("Running instance...")
         self.training = dict()
-        self.sentences = None
-        self.generate()
+        self.testing = dict()
+        self.generate() # split into training and testing sets
         self.prepare_dataset()
         self.train()
         self.predict()
+
+    def preprocess(self):
+        self.mkdir(os.path.join(self.config.src, "sentences"))
+
+        if self.config.should_skip("preprocessing"):
+            self.log("Skipping preprocessing...")
+            return
+
+        self.log("Preprocessing...")
     
-    def generate(self):
         self.log("Generating sample documents...")
 
-        # Gather all sentences
-        self.log("Gathering sentences from corpus...")
+        # Gather all sentences from the corpus.
         sentences = {author: [] for author in self.config.authors}
         for author_config in self.config.corpus:
             author = author_config.author
             src = glob.glob(author_config.src)
-            author_identifier = self.config.authors[author]
             for filename in src:
                 contents = open(filename).read().replace("\n", " ")
                 sentences[author].extend(nltk.sent_tokenize(contents))
 
-        # Separate into testing and training
-        # Store training data away, keep only the testing data
         for author in self.config.authors:
-            random.shuffle(sentences[author])
-            length = len(sentences[author])
-            num_training = math.ceil(length * self.config.training_threshold)
-            training = sentences[author][:num_training]
-            testing = sentences[author][num_training:]
+            author_identifier = self.config.authors[author]
+            digits = math.ceil(math.log10(len(sentences[author])))
+            for i, sentence in enumerate(sentences[author]):
+                dirname = f"{author_identifier}_{str(i).zfill(digits)}"
+                self.log(f"Preprocessing {dirname}...")
+                self.mkdir(os.path.join(self.config.src, "sentences", dirname))
+                for preprocessor in self.config.preprocessors:
+                    filename = os.path.join(self.config.src, "sentences", dirname, preprocessor.name)
+                    if os.path.exists(filename):
+                        self.log(f"    Skipping {preprocessor.name} for {dirname}, already exists...")
+                        continue
+                    self.log(f"    Using preprocessor {preprocessor.name} for {dirname}...")
+                    result = preprocessor.process(sentence)
+                    f = open(filename, "w")
+                    f.write(result)
+                    f.close()
+    
+    def load_sentences(self):
+        """Loads forms of all sentences into memory, indexed using identifiers and storing a Sentence"""
+        self.log("Loading sentences...")
+        self.sentences = dict()
+        for author in self.config.authors:
+            author_identifier = self.config.authors[author]
+            identifiers = glob.glob(os.path.join(self.config.src, "sentences", f"{author_identifier}_*"))
+            for identifier in identifiers:
+                sentence = Sentence(author, identifier)
+                self.sentences[identifier] = sentence
+
+    def generate(self):
+
+        # Process sentences.
+        sentences = dict()
+
+        # Separate each author's sentences into testing and training set.
+        for author in self.config.authors:
+            author_identifier = self.config.authors[author]
+            sentences = { sentence: self.sentences[sentence] for sentence in self.sentences if self.sentences[sentence].author == author }
+            identifiers = list(sentences.keys())
+            num_training = math.ceil(len(identifiers) * self.config.training_threshold)
+            training = identifiers[:num_training]
+            testing = identifiers[num_training:]
             self.training[author] = training
-            sentences[author] = testing
+            self.testing[author] = testing
 
         # Make directory
         self.mkdir(os.path.join(self.config.src, "composite"))
 
-        # Generate documents
+        # Generate documents as a list of (author, sentence) pairs
+        self.composites = []
         all_authors = list(self.config.authors.keys())
         digits = math.ceil(math.log10(self.config.generate.n))
         for i in range(self.config.generate.n):
             document = []
             authors = []
+            composite = []
             author = np.random.choice(all_authors)
             while True:
 
@@ -138,14 +182,14 @@ class Runner():
 
                     # Document is of sufficient length, done generating.
                     if len(document) >= self.config.generate.threshold:
+                        self.composites.append(composite)
                         break
 
                     # Document isn't long enough, try re-generating.
                     else:
-                        for sentence, author in zip(document, authors):
-                            sentences[author].append(sentence)
                         document = []
                         authors = []
+                        composite = []
                         author = np.random.choice(all_authors)
                         continue
 
@@ -153,16 +197,16 @@ class Runner():
                     author = np.random.choice([a for a in all_authors if a != author])
 
                 # Choose a random sentence by the author.
-                sentence = np.random.choice(sentences[author])
-                document.append(sentence)
+                sentence = self.sentences[np.random.choice(self.testing[author])]
+                document.append(sentence.text)
                 authors.append(author)
-                # sentences[author].remove(sentence)
+                composite.append((author, sentence))
 
             doc_filename = os.path.join(self.config.src, "composite", f"{str(i).zfill(digits)}_doc.txt")
             author_filename = os.path.join(self.config.src, "composite", f"{str(i).zfill(digits)}_authors.txt")
             with open(doc_filename, "w") as f:
-                for sentence in document:
-                    f.write(sentence)
+                for path in document:
+                    f.write(path)
                     f.write("\n")
             with open(author_filename, "w") as f:
                 for author in authors:
@@ -170,7 +214,8 @@ class Runner():
                     f.write("\n")
             
             self.log(f"Generated document {doc_filename}...")
-        self.sentences = sentences
+        
+        print(self.composites)
 
     def prepare_dataset(self):
         self.log("Preparing dataset...")
@@ -219,6 +264,7 @@ class Config():
         self.authors = self.get_authors()
         self.generate = self.get_generate_prob()
         self.features = self.get_features()
+        self.preprocessors = self.get_preprocessors()
         self.clean = self.get_clean()
     
     def get_corpus(self):
@@ -249,8 +295,17 @@ class Config():
             data.append(Feature(feature))
         return data
 
+    def get_preprocessors(self):
+        preprocessors = []
+        for preprocessor in self.config["preprocessors"]:
+            preprocessors.append(Preprocessor(preprocessor))
+        return preprocessors
+
     def get_clean(self):
         return [os.path.join(self.src, dirname) for dirname in self.config["configuration"]["clean"]]
+    
+    def should_skip(self, step):
+        return step in self.config["configuration"].get("skip", [])
 
 class Feature():
 
@@ -266,6 +321,32 @@ class Feature():
         contents = dataset.contents
         vectors = self.module.train(self.config, contents)
         dataset.add_vectors(vectors)
+
+class Preprocessor():
+
+    def __init__(self, name):
+        try:
+            self.name = name
+            self.module = importlib.import_module(f"preprocessors.{name}")
+        except ModuleNotFoundError:
+            raise Exception(f"Could not find preprocessor {name}.")
+
+    def process(self, contents):
+        return self.module.preprocess(contents)
+
+class Sentence():
+
+    def __init__(self, author, dirname):
+        self.author = author
+        attributes = os.listdir(dirname)
+        self.attributes = { attribute: open(os.path.join(dirname, attribute)).read().rstrip("\n")
+                            for attribute in attributes }
+
+    def __getattr__(self, attr):
+        if attr in self.attributes:
+            return self.attributes[attr]
+        else:
+            raise AttributeError
 
 def main():
     config = parse_config()
