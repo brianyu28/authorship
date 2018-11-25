@@ -1,8 +1,10 @@
 configuration:
   src: data/bronte
   train: 0.8
+  accuracy: 0.7179 # accuracy estimation
   skip:
-    - preprocessing
+    - 
+    # - preprocessing
   clean:
     - composite
 
@@ -27,22 +29,19 @@ generate:
 
 preprocessors:
   - text
+  - pos
 
 features:
   - name: word_length
   - name: ngram
-    length: 5
-    type: text
-    threshold: 150
-  - name: ngram
     length: 4
     type: text
-    threshold: 150
+    threshold: 10
   - name: ngram
     length: 3
     type: text
-    threshold: 150
+    threshold: 10
   - name: ngram
     length: 2
     type: text
-    threshold: 150
+    threshold: 10

@@ -19,11 +19,11 @@ def train(feature, texts):
         if is_training(identifier):
             cumulative += counters[identifier]
 
+    print(cumulative)
     # Limit cumulative counter
     if threshold is not None:
         prune_counter(cumulative, threshold)
     cumulative = cumulative.most_common(top)
-    print(cumulative)
 
     vectors = {}
     for identifier in texts:
@@ -35,7 +35,11 @@ def ngrams(text, n, ngram_type):
         words = nltk.word_tokenize(text.lower())
     else:
         words = text.split() # for POS or CCG tagging, just split on spaces
-    return Counter(nltk.ngrams(words, n))
+    try:
+        ngrams = list(nltk.ngrams(words, n))
+    except RuntimeError:
+        ngrams = []
+    return Counter(ngrams)
 
 def compute_vector(counter, cumulative):
     length = sum(counter.values())

@@ -11,7 +11,10 @@ import numpy as np
 import os
 import random
 import shutil
+import tabulate
 import yaml
+
+import markov
 
 VERBOSE = False
 
@@ -41,12 +44,12 @@ class Dataset():
         self.vectors = dict()
         for author in self.training:
             for i, sentence in enumerate(self.training[author]):
-                self.contents[(0, author, i)] = {"text": sentence}
+                self.contents[(0, author, i)] = sentence
                 self.vectors[(0, author, i)] = []
-        for filename in self.testing:
-            for i, sentence in enumerate(self.testing[filename]):
-                self.contents[(1, filename, i)] = {"text": sentence}
-                self.vectors[(1, filename, i)] = []
+        for i, composite in enumerate(self.testing):
+            for j, sentence in enumerate(composite):
+                self.contents[(1, i, j)] = sentence
+                self.vectors[(1, i, j)] = []
     
     def add_vectors(self, vectors):
         for identifier in vectors:
@@ -63,14 +66,15 @@ class Dataset():
         return data, labels
 
     def predict(self, clf):
-        self.predictions = {}
-        for filename in self.testing:
+        self.predictions = []
+        for i, composite in enumerate(self.testing):
             vectors = []
-            for i, sentence in enumerate(self.testing[filename]):
-                vectors.append(self.vectors[(1, filename, i)])
+            for j, sentence in enumerate(composite):
+                vectors.append(self.vectors[(1, i, j)])
             predictions = list(clf.predict(vectors))
-            self.predictions[filename] = predictions
-        print(self.predictions)
+            self.predictions.append(predictions)
+            for j, sentence in enumerate(composite):
+                sentence.prediction = predictions[j]
 
 class Runner():
 
@@ -96,6 +100,7 @@ class Runner():
         self.prepare_dataset()
         self.train()
         self.predict()
+        self.print_results()
 
     def preprocess(self):
         self.mkdir(os.path.join(self.config.src, "sentences"))
@@ -159,13 +164,13 @@ class Runner():
             num_training = math.ceil(len(identifiers) * self.config.training_threshold)
             training = identifiers[:num_training]
             testing = identifiers[num_training:]
-            self.training[author] = training
+            self.training[author] = [self.sentences[identifier] for identifier in training]
             self.testing[author] = testing
 
         # Make directory
         self.mkdir(os.path.join(self.config.src, "composite"))
 
-        # Generate documents as a list of (author, sentence) pairs
+        # Generate documents as a list of sentences pairs
         self.composites = []
         all_authors = list(self.config.authors.keys())
         digits = math.ceil(math.log10(self.config.generate.n))
@@ -200,7 +205,7 @@ class Runner():
                 sentence = self.sentences[np.random.choice(self.testing[author])]
                 document.append(sentence.text)
                 authors.append(author)
-                composite.append((author, sentence))
+                composite.append(sentence)
 
             doc_filename = os.path.join(self.config.src, "composite", f"{str(i).zfill(digits)}_doc.txt")
             author_filename = os.path.join(self.config.src, "composite", f"{str(i).zfill(digits)}_authors.txt")
@@ -214,8 +219,6 @@ class Runner():
                     f.write("\n")
             
             self.log(f"Generated document {doc_filename}...")
-        
-        print(self.composites)
 
     def prepare_dataset(self):
         self.log("Preparing dataset...")
@@ -223,16 +226,13 @@ class Runner():
         # Loading sentences.
         self.dataset = Dataset()
         self.dataset.set_training(self.training)
-        testing_files = glob.glob(os.path.join(self.config.src, "composite", "*_doc.txt"))
-        testing_data = dict()
-        for testing_file in testing_files:
-            testing_data[testing_file] = open(testing_file).read().splitlines()
-        self.dataset.set_testing(testing_data)
+        self.dataset.set_testing(self.composites)
         self.dataset.prepare()
     
     def train(self):
         self.log("Computing vectors...")
         for feature in self.config.features:
+            self.log(f"Training feature {feature.name} ({feature.config})...")
             vectors = feature.train(self.dataset)
         
         self.log("Fitting...")
@@ -241,7 +241,57 @@ class Runner():
         self.clf.fit(data, labels)
 
     def predict(self):
+        # Do the actual sentence prediction.
         self.dataset.predict(self.clf)
+
+        # Now guess the likely sequences.
+        self.dataset.composite_predictions = []
+        for composite in self.dataset.testing:
+            prediction = markov.predict_assignments(self.config.authors.keys(), [sentence.prediction for sentence in composite], self.config.accuracy)
+            self.dataset.composite_predictions.append(prediction)
+            for i, sentence in enumerate(composite):
+                sentence.composite_prediction = prediction[i]
+
+    def print_results(self):
+        (accurate, inaccurate) = (0, 0)
+        (composite_accurate, composite_inaccurate) = (0, 0)
+        for i, composite in enumerate(self.dataset.testing):
+            (c_accurate, c_inaccurate) = (0, 0)
+            (c_composite_accurate, c_composite_inaccurate) = (0, 0)
+            print(f"COMPOSITE {i}")
+            data = []
+            for j, sentence in enumerate(composite):
+                data.append([sentence.identifier,
+                             sentence.author,
+                             sentence.prediction,
+                             sentence.composite_prediction,
+                             "Yes" if sentence.author == sentence.prediction else "No",
+                             "Yes" if sentence.author == sentence.composite_prediction else "No"])
+                if sentence.author == sentence.prediction:
+                    c_accurate += 1
+                else:
+                    c_inaccurate += 1
+                if sentence.author == sentence.composite_prediction:
+                    c_composite_accurate += 1
+                else:
+                    c_composite_inaccurate += 1
+            accurate += c_accurate
+            inaccurate += c_inaccurate
+            composite_accurate += c_composite_accurate
+            composite_inaccurate += c_composite_inaccurate
+            print(tabulate.tabulate(data, headers=["Identifier", "Author", "Prediction", "Composite Prediction", "Accurate", "Composite Accurate"], tablefmt="psql"))
+            accuracy = "{:.2f}%".format((c_accurate / (c_accurate + c_inaccurate)) * 100)
+            composite_accuracy = "{:.2f}%".format((c_composite_accurate / (c_composite_accurate + c_composite_inaccurate)) * 100)
+            print(f"Accuracy: {c_accurate} of {c_accurate + c_inaccurate} ({accuracy})")
+            print(f"Composite Accuracy: {c_composite_accurate} of {c_composite_accurate + c_composite_inaccurate} ({composite_accuracy})")
+            print()
+        print()
+        print("OVERALL:")
+        accuracy = "{:.2f}%".format((accurate / (accurate + inaccurate)) * 100)
+        composite_accuracy = "{:.2f}%".format((composite_accurate / (composite_accurate + composite_inaccurate)) * 100)
+        print(f"Overall Accuracy: {accurate} of {accurate + inaccurate} ({accuracy})")
+        print(f"Overall Composite Accuracy: {composite_accurate} of {composite_accurate + composite_inaccurate} ({composite_accuracy})")
+        print(self.dataset.predictions)
 
     def mkdir(self, dirname):
         try:
@@ -260,6 +310,7 @@ class Config():
         self.config = contents
         self.src = self.config["configuration"]["src"]
         self.training_threshold = self.config["configuration"]["train"]
+        self.accuracy = self.config["configuration"]["accuracy"]
         self.corpus = self.get_corpus()
         self.authors = self.get_authors()
         self.generate = self.get_generate_prob()
@@ -338,6 +389,7 @@ class Sentence():
 
     def __init__(self, author, dirname):
         self.author = author
+        self.identifier = dirname
         attributes = os.listdir(dirname)
         self.attributes = { attribute: open(os.path.join(dirname, attribute)).read().rstrip("\n")
                             for attribute in attributes }
@@ -346,7 +398,13 @@ class Sentence():
         if attr in self.attributes:
             return self.attributes[attr]
         else:
+            print(attr)
+            print(self.attributes)
+            print(attr in self.attributes)
             raise AttributeError
+
+    def get(self, attr):
+        return self.__getattr__(attr)
 
 def main():
     config = parse_config()
