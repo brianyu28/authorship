@@ -3,7 +3,7 @@ configuration:
   train: 0.8
   accuracy: 0.7179 # accuracy estimation
   skip:
-    - 
+    -
     # - preprocessing
   clean:
     - composite
@@ -30,18 +30,47 @@ generate:
 preprocessors:
   - text
   - pos
+  - ccg
 
 features:
   - name: word_length
   - name: ngram
+    length: 6
+    type: ccg
+    threshold: 10
+  - name: ngram
+    length: 5
+    type: ccg
+    threshold: 10
+  - name: ngram
     length: 4
-    type: text
+    type: ccg
     threshold: 10
   - name: ngram
     length: 3
-    type: text
+    type: ccg
     threshold: 10
   - name: ngram
     length: 2
-    type: text
+    type: ccg
+    threshold: 10
+  - name: ngram
+    length: 6
+    type: pos
+    threshold: 10
+  - name: ngram
+    length: 5
+    type: pos
+    threshold: 10
+  - name: ngram
+    length: 4
+    type: pos
+    threshold: 10
+  - name: ngram
+    length: 3
+    type: pos
+    threshold: 10
+  - name: ngram
+    length: 2
+    type: pos
     threshold: 10
