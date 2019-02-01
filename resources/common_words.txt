@@ -4998,3 +4998,7 @@ kid
 middle-class
 apology
 till
+is
+was
+were
+an

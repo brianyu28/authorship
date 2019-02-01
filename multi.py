@@ -11,6 +11,7 @@ import numpy as np
 import os
 import random
 import shutil
+import sys
 import tabulate
 import yaml
 
@@ -28,10 +29,10 @@ class Dataset():
             - Sample Filename
                 - Sentences
     """
-    
+
     def __init__(self):
         pass
-    
+
     def set_training(self, training):
         self.training = training
 
@@ -50,7 +51,7 @@ class Dataset():
             for j, sentence in enumerate(composite):
                 self.contents[(1, i, j)] = sentence
                 self.vectors[(1, i, j)] = []
-    
+
     def add_vectors(self, vectors):
         for identifier in vectors:
             self.vectors[identifier].extend(vectors[identifier])
@@ -82,16 +83,18 @@ class Runner():
         self.log("Initializing runner...")
         self.config = config
 
-    def log(self, message, override=False):
+    def log(self, message, override=False, clearline=False):
         if override or VERBOSE:
+            if clearline:
+                sys.stdout.write("\033[F")
             print(message)
-    
+
     def run(self):
         self.clean()
         self.preprocess()
         self.load_sentences()
         self.run_instance()  # loop this line multiple times if needed
-    
+
     def run_instance(self):
         self.log("Running instance...")
         self.training = dict()
@@ -110,7 +113,7 @@ class Runner():
             return
 
         self.log("Preprocessing...")
-    
+
         self.log("Generating sample documents...")
 
         # Gather all sentences from the corpus.
@@ -139,15 +142,16 @@ class Runner():
                     f = open(filename, "w")
                     f.write(result)
                     f.close()
-    
+
     def load_sentences(self):
         """Loads forms of all sentences into memory, indexed using identifiers and storing a Sentence"""
         self.log("Loading sentences...")
         self.sentences = dict()
-        for author in self.config.authors:
+        for i, author in enumerate(self.config.authors):
             author_identifier = self.config.authors[author]
             identifiers = glob.glob(os.path.join(self.config.src, "sentences", f"{author_identifier}_*"))
-            for identifier in identifiers:
+            for j, identifier in enumerate(identifiers):
+                self.log(f"    Loading sentence {j + 1} of {len(identifiers)} for author {i+1} of {len(self.config.authors)}...", clearline=i > 0 or j > 0)
                 sentence = Sentence(author, identifier)
                 self.sentences[identifier] = sentence
 
@@ -217,7 +221,7 @@ class Runner():
                 for author in authors:
                     f.write(author)
                     f.write("\n")
-            
+
             self.log(f"Generated document {doc_filename}...")
 
     def prepare_dataset(self):
@@ -228,13 +232,13 @@ class Runner():
         self.dataset.set_training(self.training)
         self.dataset.set_testing(self.composites)
         self.dataset.prepare()
-    
+
     def train(self):
         self.log("Computing vectors...")
         for feature in self.config.features:
             self.log(f"Training feature {feature.name} ({feature.config})...")
             vectors = feature.train(self.dataset)
-        
+
         self.log("Fitting...")
         data, labels = self.dataset.training_labels()
         self.clf = GaussianNB()
@@ -317,7 +321,7 @@ class Config():
         self.features = self.get_features()
         self.preprocessors = self.get_preprocessors()
         self.clean = self.get_clean()
-    
+
     def get_corpus(self):
         data = []
         for author_config in self.config["corpus"]:
@@ -339,7 +343,7 @@ class Config():
             setattr(data, feature, self.config["generate"][feature])
         data.next = 1 - data.stay - data.terminate
         return data
-    
+
     def get_features(self):
         data = []
         for feature in self.config["features"]:
@@ -354,7 +358,7 @@ class Config():
 
     def get_clean(self):
         return [os.path.join(self.src, dirname) for dirname in self.config["configuration"]["clean"]]
-    
+
     def should_skip(self, step):
         return step in self.config["configuration"].get("skip", [])
 

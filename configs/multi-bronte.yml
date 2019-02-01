@@ -1,7 +1,7 @@
 configuration:
   src: data/bronte
   train: 0.8
-  accuracy: 0.7179 # accuracy estimation
+  accuracy: 0.6 # accuracy estimation
   skip:
     -
     # - preprocessing
@@ -22,7 +22,7 @@ corpus:
     author: Emily Bronte
 
 generate:
-  n: 3
+  n: 10
   stay: 0.95
   terminate: 0.01
   threshold: 50 # sentence threshold
@@ -31,46 +31,28 @@ preprocessors:
   - text
   - pos
   - ccg
+  - redacted
+  - paths
+  - cpfws
 
 features:
-  - name: word_length
   - name: ngram
-    length: 6
-    type: ccg
-    threshold: 10
-  - name: ngram
-    length: 5
-    type: ccg
-    threshold: 10
-  - name: ngram
-    length: 4
-    type: ccg
-    threshold: 10
-  - name: ngram
-    length: 3
-    type: ccg
-    threshold: 10
+    length: 1
+    type: redacted
+    threshold: 30
   - name: ngram
     length: 2
-    type: ccg
-    threshold: 10
-  - name: ngram
-    length: 6
-    type: pos
-    threshold: 10
-  - name: ngram
-    length: 5
-    type: pos
-    threshold: 10
-  - name: ngram
-    length: 4
-    type: pos
-    threshold: 10
+    type: redacted
+    threshold: 30
   - name: ngram
     length: 3
-    type: pos
-    threshold: 10
+    type: redacted
+    threshold: 30
+
+non_features:
+  - name: word_frequency
+    filename: resources/function_words.txt
   - name: ngram
-    length: 2
-    type: pos
-    threshold: 10
+    length: 1
+    type: cpfws
+    threshold: 40

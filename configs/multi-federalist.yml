@@ -1,0 +1,35 @@
+configuration:
+  src: data/federalist
+  train: 0.8
+  accuracy: 0.6 # accuracy estimation
+  skip:
+    -
+    # - preprocessing
+  clean:
+    - composite
+
+authors:
+  Alexander Hamilton: hamilton
+  James Madison: madison
+
+corpus:
+  - src: corpus/*hamilton*.txt
+    author: Alexander Hamilton
+  - src: corpus/*madison*.txt
+    author: James Madison
+
+generate:
+  n: 10
+  stay: 0.95
+  terminate: 0.01
+  threshold: 50 # sentence threshold
+
+preprocessors:
+  - text
+  - pos
+  - redacted
+  - cpfws
+
+features:
+  - name: word_frequency
+    filename: resources/function_words.txt
