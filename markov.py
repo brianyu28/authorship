@@ -10,9 +10,6 @@ def predict_assignments(authors, assignments, accuracy):
     Given a list of emission assignments `assignments`
     Given that the emissions are accurate with probability `accuracy`
     """
-    print(authors)
-    print(assignments)
-    print(accuracy)
     distributions = [distribution_for_author(author, authors, accuracy) for author in authors]
     stay = 0.25 + (random.random() / 2) # generate random number between .25 and .75
     transition_matrix = [[stay if a == author else (1-stay)/(len(authors) - 1) for a in authors] for author in authors]

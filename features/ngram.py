@@ -38,7 +38,7 @@ def train(feature, texts):
 def ngrams(text, n, ngram_type):
     if ngram_type == "text":
         words = nltk.word_tokenize(text.lower())
-    elif ngram_type in ["paths", "cpfws"]: # paths are stored one per line
+    elif (ngram_type in ["paths", "cpfws"]) or ngram_type.startswith("lops"): # paths are stored one per line
         words = text.split("\n")
     else:
         words = text.split() # for POS or CCG tagging, just split on spaces

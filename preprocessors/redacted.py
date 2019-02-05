@@ -9,5 +9,5 @@ def preprocess(contents):
     return result
 
 def filter_words(words, tokens):
-    return [(word if word in words or (not any(c.isalpha() for c in word)) else "UNKNOWN")
+    return [(word if word.lower() in words or (not any(c.isalpha() for c in word)) else "UNKNOWN")
              for word in tokens]

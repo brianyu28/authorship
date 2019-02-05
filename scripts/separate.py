@@ -13,36 +13,27 @@ import random
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Splits documents into training and testing set."
+        description="Splits documents into a number of different sets."
     )
     parser.add_argument("dirname", type=str)
-    parser.add_argument("-p", "--proportion", type=float, default=0.2,
-        help="Proportion of documents to put into testing.")
+    parser.add_argument("number", type=int)
 
     args = parser.parse_args()
     files = os.listdir(args.dirname)
-    random.shuffle(files)
-    test_count = math.floor(len(files) * args.proportion)
-    testing = files[:test_count]
-    training = files[test_count:]
 
-    try:
-        os.mkdir(os.path.join(args.dirname, "testing"))
-    except FileExistsError:
-        pass
-    try:
-        os.mkdir(os.path.join(args.dirname, "training"))
-    except FileExistsError:
-        pass
+    # Create all of the result directories.
+    for i in range(args.number):
+        try:
+            print("Creating directory", (args.dirname + str(i)), "...")
+            os.mkdir(args.dirname + str(i))
+        except FileExistsError:
+            pass
 
-    for filename in testing:
+    for filename in files:
+        choice = random.choice(list(range(args.number)))
+        print("Sorting file", filename, "into choice", choice, "...")
         os.rename(os.path.join(args.dirname, filename),
-                  os.path.join(args.dirname, "testing", filename))
-        print(f"Sorted {filename} into testing...")
-    for filename in training:
-        os.rename(os.path.join(args.dirname, filename),
-                  os.path.join(args.dirname, "training", filename))
-        print(f"Sorted {filename} into training...")
+                  os.path.join(args.dirname + str(choice), filename))
 
 if __name__ == "__main__":
     main()

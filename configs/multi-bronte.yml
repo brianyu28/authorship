@@ -3,10 +3,11 @@ configuration:
   train: 0.8
   accuracy: 0.6 # accuracy estimation
   skip:
-    -
-    # - preprocessing
+    # - none
+    - preprocessing
   clean:
     - composite
+  sentence_dir: sentences9
 
 authors:
   Anne Bronte: anne
@@ -22,7 +23,7 @@ corpus:
     author: Emily Bronte
 
 generate:
-  n: 10
+  n: 1
   stay: 0.95
   terminate: 0.01
   threshold: 50 # sentence threshold
@@ -34,25 +35,41 @@ preprocessors:
   - redacted
   - paths
   - cpfws
+  - constituency
+
+features_cpfws:
+  - name: ngram
+    length: 1
+    type: cpfws
+    threshold: 5
 
 features:
   - name: ngram
     length: 1
-    type: redacted
-    threshold: 30
+    type: pos
+    threshold: 5
   - name: ngram
     length: 2
-    type: redacted
-    threshold: 30
+    type: pos
+    threshold: 5
   - name: ngram
     length: 3
-    type: redacted
-    threshold: 30
-
-non_features:
-  - name: word_frequency
-    filename: resources/function_words.txt
+    type: pos
+    threshold: 5
   - name: ngram
     length: 1
-    type: cpfws
-    threshold: 40
+    type: ccg
+    threshold: 5
+  - name: ngram
+    length: 2
+    type: ccg
+    threshold: 5
+  - name: ngram
+    length: 3
+    type: ccg
+    threshold: 5
+
+features_fn:
+  - name: word_frequency
+    filename: resources/function_words.txt
+
