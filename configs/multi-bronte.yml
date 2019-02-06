@@ -7,7 +7,7 @@ configuration:
     - preprocessing
   clean:
     - composite
-  sentence_dir: sentences9
+  sentence_dir: sentences
 
 authors:
   Anne Bronte: anne
@@ -46,27 +46,15 @@ features_cpfws:
 features:
   - name: ngram
     length: 1
-    type: pos
+    type: text
     threshold: 5
   - name: ngram
     length: 2
-    type: pos
+    type: text
     threshold: 5
   - name: ngram
     length: 3
-    type: pos
-    threshold: 5
-  - name: ngram
-    length: 1
-    type: ccg
-    threshold: 5
-  - name: ngram
-    length: 2
-    type: ccg
-    threshold: 5
-  - name: ngram
-    length: 3
-    type: ccg
+    type: text
     threshold: 5
 
 features_fn:

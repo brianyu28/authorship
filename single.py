@@ -1,3 +1,12 @@
+"""
+Variant on Multi-Author Attribution System for Single-Author Attribution
+
+Two evaluation methods:
+- whole document vector
+- sentence-level vectors and taking the plurality
+"""
+
+from collections import Counter
 from types import SimpleNamespace
 from sklearn.naive_bayes import GaussianNB
 
@@ -17,17 +26,24 @@ import yaml
 
 import markov
 
+# (a, b, c) correspond tot hese values
+TRAINING_DOCUMENTS_PER_AUTHOR = 10 # Train = n
+TESTING_DOCUMENTS_PER_AUTHOR = 50
+SENTENCES_PER_DOCUMENT = 50
+
 VERBOSE = False
 
 class Dataset():
     """
-    Maintains dataset of:
-        - Training Data [0]
-            - Authors
-                - Sentences
-        - Testing Data [1]
-            - Sample Filename
-                - Sentences
+
+    Two instantiations.
+    Whole Document Vector
+    Training [0]: (0, author, sentence_index)
+    Testing [1]: (1, document_index, 0) <- 0 because there will only ever be one sentence index
+
+    Sentence-Level Vectors
+    Training [0]: (0, author, sentence_index)
+    Testing [1]: (1, document_index, sentence_index)
     """
 
     def __init__(self):
@@ -93,7 +109,10 @@ class Runner():
         self.clean()
         self.preprocess()
         self.load_sentences()
-        self.run_instance()  # loop this line multiple times if needed
+        for i in range(10):
+            print(f"START INSTANCE {i}")
+            self.run_instance()  # loop this line multiple times if needed
+            print(f"END INSTANCE {i}")
 
     def run_instance(self):
         self.log("Running instance...")
@@ -156,154 +175,108 @@ class Runner():
                 self.sentences[identifier] = sentence
 
     def generate(self):
+        
+        def generate_document_from_sentences(sentences, n):
+            sampled = [] 
+            for i in range(n):
+                k = random.randint(0, len(sentences) - 1)
+                sampled.append(sentences[k])
+                del sentences[k]
+            return sampled
+        
+        self.training_documents = {}
+        self.testing_documents = []
 
-        def random_choice(authors):
-            """Picks a random author, using a non-uniform distribution."""
-            probabilities = []
-            for i in authors:
-                probabilities.append(random.randint(1, 10))
-            probabilities = [x / sum(probabilities) for x in probabilities]
-            return np.random.choice(authors, p=probabilities)
-
-        # Process sentences.
-        sentences = dict()
-
-        # Separate each author's sentences into testing and training set.
         for author in self.config.authors:
-            author_identifier = self.config.authors[author]
+            self.training_documents[author] = []
             sentences = { sentence: self.sentences[sentence] for sentence in self.sentences if self.sentences[sentence].author == author }
             identifiers = list(sentences.keys())
-            num_training = math.ceil(len(identifiers) * self.config.training_threshold)
-            training = identifiers[:num_training]
-            testing = identifiers[num_training:]
-            self.training[author] = [self.sentences[identifier] for identifier in training]
-            self.testing[author] = testing
 
-        # Make directory
-        self.mkdir(os.path.join(self.config.src, "composite"))
+            for i in range(TRAINING_DOCUMENTS_PER_AUTHOR):
+                sampled = generate_document_from_sentences(identifiers, SENTENCES_PER_DOCUMENT)
+                sentences = [self.sentences[identifier] for identifier in sampled]
+                document = Document(author, f"Training Document {i}", sentences)
+                self.training_documents[author].append(document)
 
-        # Generate documents as a list of sentences pairs
-        self.composites = []
-        all_authors = list(self.config.authors.keys())
-        digits = math.ceil(math.log10(self.config.generate.n))
-        for i in range(self.config.generate.n):
-            document = []
-            authors = []
-            composite = []
-            author = random_choice(all_authors)
-            while True:
+            for i in range(TESTING_DOCUMENTS_PER_AUTHOR):
+                sampled = generate_document_from_sentences(identifiers, SENTENCES_PER_DOCUMENT)
+                sentences = [self.sentences[identifier] for identifier in sampled]
+                document = Document(author, f"Testing Document {i}", sentences)
+                self.testing_documents.append(document)
 
-                action = np.random.choice(["STAY", "NEXT", "TERMINATE"],
-                          p=[self.config.generate.stay, self.config.generate.next, self.config.generate.terminate])
-                if action == "TERMINATE":
-
-                    # Document is of sufficient length, done generating.
-                    if len(document) >= self.config.generate.threshold:
-                        self.composites.append(composite)
-                        break
-
-                    # Document isn't long enough, try re-generating.
-                    else:
-                        document = []
-                        authors = []
-                        composite = []
-                        author = np.random.choice(all_authors)
-                        continue
-
-                elif action == "NEXT":
-                    author = np.random.choice([a for a in all_authors if a != author])
-
-                # Choose a random sentence by the author.
-                sentence = self.sentences[np.random.choice(self.testing[author])]
-                document.append(sentence.text)
-                authors.append(author)
-                composite.append(sentence)
-
-            doc_filename = os.path.join(self.config.src, "composite", f"{str(i).zfill(digits)}_doc.txt")
-            author_filename = os.path.join(self.config.src, "composite", f"{str(i).zfill(digits)}_authors.txt")
-            with open(doc_filename, "w") as f:
-                for path in document:
-                    f.write(path)
-                    f.write("\n")
-            with open(author_filename, "w") as f:
-                for author in authors:
-                    f.write(author)
-                    f.write("\n")
-
-            self.log(f"Generated document {doc_filename}...")
+        self.log(f"Done generating documents.")
 
     def prepare_dataset(self):
-        self.log("Preparing dataset...")
+        self.log("Preparing datasets...")
 
-        # Loading sentences.
-        self.dataset = Dataset()
-        self.dataset.set_training(self.training)
-        self.dataset.set_testing(self.composites)
-        self.dataset.prepare()
+        # Loading sentences into two datasets, one for the whole dataset and one for sentences.
+        self.whole_dataset = Dataset()
+        self.whole_dataset.set_training(self.training_documents)
+        self.whole_dataset.set_testing([[document] for document in self.testing_documents])
+        self.whole_dataset.prepare()
+
+        self.sentence_dataset = Dataset()
+        training = {}
+        for author in self.training_documents:
+            training[author] = []
+            for document in self.training_documents[author]:
+                training[author].extend(document.sentences)
+        testing = []
+        for document in self.testing_documents:
+            testing.append(document.sentences)
+        self.sentence_dataset.set_training(training)
+        self.sentence_dataset.set_testing(testing)
+        self.sentence_dataset.prepare()
+        print("Done preparing dataset.")
 
     def train(self):
         self.log("Computing vectors...")
         for feature in self.config.features:
             self.log(f"Training feature {feature.name} ({feature.config})...")
-            vectors = feature.train(self.dataset)
+            vectors = feature.train(self.whole_dataset)
+            vectors = feature.train(self.sentence_dataset)
 
         self.log("Fitting...")
-        data, labels = self.dataset.training_labels()
-        self.clf = GaussianNB()
-        self.clf.fit(data, labels)
+        data, labels = self.whole_dataset.training_labels()
+        self.whole_clf = GaussianNB()
+        self.whole_clf.fit(data, labels)
+
+        data, labels = self.sentence_dataset.training_labels()
+        self.sentence_clf = GaussianNB()
+        self.sentence_clf.fit(data, labels)
 
     def predict(self):
         # Do the actual sentence prediction.
-        self.dataset.predict(self.clf)
-
-        # Now guess the likely sequences.
-        self.dataset.composite_predictions = []
-        for composite in self.dataset.testing:
-            prediction = markov.predict_assignments(self.config.authors.keys(), [sentence.prediction for sentence in composite], self.config.accuracy)
-            self.dataset.composite_predictions.append(prediction)
-            for i, sentence in enumerate(composite):
-                sentence.composite_prediction = prediction[i]
+        self.log("Predicting...")
+        self.whole_dataset.predict(self.whole_clf)
+        self.sentence_dataset.predict(self.sentence_clf)
 
     def print_results(self):
-        (accurate, inaccurate) = (0, 0)
-        (composite_accurate, composite_inaccurate) = (0, 0)
-        for i, composite in enumerate(self.dataset.testing):
-            (c_accurate, c_inaccurate) = (0, 0)
-            (c_composite_accurate, c_composite_inaccurate) = (0, 0)
-            print(f"COMPOSITE {i}")
-            data = []
-            for j, sentence in enumerate(composite):
-                data.append([sentence.identifier,
-                             sentence.author,
-                             sentence.prediction,
-                             sentence.composite_prediction,
-                             "Yes" if sentence.author == sentence.prediction else "No",
-                             "Yes" if sentence.author == sentence.composite_prediction else "No"])
-                if sentence.author == sentence.prediction:
-                    c_accurate += 1
-                else:
-                    c_inaccurate += 1
-                if sentence.author == sentence.composite_prediction:
-                    c_composite_accurate += 1
-                else:
-                    c_composite_inaccurate += 1
-            accurate += c_accurate
-            inaccurate += c_inaccurate
-            composite_accurate += c_composite_accurate
-            composite_inaccurate += c_composite_inaccurate
-            print(tabulate.tabulate(data, headers=["Identifier", "Author", "Prediction", "Composite Prediction", "Accurate", "Composite Accurate"], tablefmt="psql"))
-            accuracy = "{:.2f}%".format((c_accurate / (c_accurate + c_inaccurate)) * 100)
-            composite_accuracy = "{:.2f}%".format((c_composite_accurate / (c_composite_accurate + c_composite_inaccurate)) * 100)
-            print(f"Accuracy: {c_accurate} of {c_accurate + c_inaccurate} ({accuracy})")
-            print(f"Composite Accuracy: {c_composite_accurate} of {c_composite_accurate + c_composite_inaccurate} ({composite_accuracy})")
-            print()
-        print()
-        print("OVERALL:")
-        accuracy = "{:.2f}%".format((accurate / (accurate + inaccurate)) * 100)
-        composite_accuracy = "{:.2f}%".format((composite_accurate / (composite_accurate + composite_inaccurate)) * 100)
-        print(f"Overall Accuracy: {accurate} of {accurate + inaccurate} ({accuracy})")
-        print(f"Overall Composite Accuracy: {composite_accurate} of {composite_accurate + composite_inaccurate} ({composite_accuracy})")
-        print(self.dataset.predictions)
+        (overall_accurate, overall_inaccurate) = (0, 0)
+        (sentence_accurate, sentence_inaccurate) = (0, 0)
+
+        data = []
+        for i in range(len(self.whole_dataset.testing)):
+            author = self.whole_dataset.testing[i][0].author
+            whole_prediction = self.whole_dataset.testing[i][0].prediction
+            sentence_counts = Counter([sentence.prediction for sentence in self.sentence_dataset.testing[i]])
+            sentence_prediction = sentence_counts.most_common(1)[0][0]
+            data.append([i, author, whole_prediction, sentence_prediction, sentence_counts])
+            if author == whole_prediction:
+                overall_accurate += 1
+            else:
+                overall_inaccurate += 1
+
+            if author == sentence_prediction:
+                sentence_accurate += 1
+            else:
+                sentence_inaccurate += 1
+
+        print(tabulate.tabulate(data, headers=["Identifier", "Author", "Whole Prediction", "Sentence Prediction", "Counts"], tablefmt="psql"))
+        overall_accuracy = "{:.2f}%".format((overall_accurate / (overall_accurate + overall_inaccurate)) * 100)
+        sentence_accuracy = "{:.2f}%".format((sentence_accurate / (sentence_accurate + sentence_inaccurate)) * 100)
+        print(f"Overall Accuracy: {overall_accurate} of {overall_accurate + overall_inaccurate} ({overall_accuracy})")
+        print(f"Sentence Accuracy: {sentence_accurate} of {sentence_accurate + sentence_inaccurate} ({sentence_accuracy})")
 
     def mkdir(self, dirname):
         try:
@@ -418,6 +391,27 @@ class Sentence():
 
     def get(self, attr):
         return self.__getattr__(attr)
+
+class Document(Sentence):
+    """
+    A document is just a list of sentences.
+    """
+    
+    def __init__(self, author, identifier, sentences):
+        self.author = author
+        self.identifier = identifier
+        self.sentences = sentences
+
+        # Combine sentences attributes.
+        self.attributes = {}
+        for sentence in self.sentences:
+            for attr in sentence.attributes:
+                if attr not in self.attributes:
+                    self.attributes[attr] = sentence.attributes[attr]
+                else:
+                    self.attributes[attr] += "\n"
+                    self.attributes[attr] += sentence.attributes[attr]
+
 
 def main():
     config = parse_config()
