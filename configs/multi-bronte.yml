@@ -43,21 +43,28 @@ features_cpfws:
     type: cpfws
     threshold: 5
 
-features:
+features_ng:
   - name: ngram
     length: 1
-    type: text
+    type: ccg
     threshold: 5
   - name: ngram
     length: 2
-    type: text
+    type: ccg
     threshold: 5
   - name: ngram
     length: 3
-    type: text
+    type: ccg
+    threshold: 5
+  - name: ngram
+    length: 4
+    type: ccg
+    threshold: 5
+  - name: ngram
+    length: 5
+    type: ccg
     threshold: 5
 
-features_fn:
+features:
   - name: word_frequency
     filename: resources/function_words.txt
-

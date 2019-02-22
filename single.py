@@ -29,7 +29,7 @@ import markov
 # (a, b, c) correspond tot hese values
 TRAINING_DOCUMENTS_PER_AUTHOR = 10 # Train = n
 TESTING_DOCUMENTS_PER_AUTHOR = 50
-SENTENCES_PER_DOCUMENT = 50
+SENTENCES_PER_DOCUMENT = 20
 
 VERBOSE = False
 
@@ -175,15 +175,15 @@ class Runner():
                 self.sentences[identifier] = sentence
 
     def generate(self):
-        
+
         def generate_document_from_sentences(sentences, n):
-            sampled = [] 
+            sampled = []
             for i in range(n):
                 k = random.randint(0, len(sentences) - 1)
                 sampled.append(sentences[k])
                 del sentences[k]
             return sampled
-        
+
         self.training_documents = {}
         self.testing_documents = []
 
@@ -396,7 +396,7 @@ class Document(Sentence):
     """
     A document is just a list of sentences.
     """
-    
+
     def __init__(self, author, identifier, sentences):
         self.author = author
         self.identifier = identifier

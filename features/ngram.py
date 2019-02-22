@@ -36,7 +36,7 @@ def train(feature, texts):
     return vectors
 
 def ngrams(text, n, ngram_type):
-    if ngram_type == "text":
+    if ngram_type in ["text", "redacted"]:
         words = nltk.word_tokenize(text.lower())
     elif (ngram_type in ["paths", "cpfws"]) or ngram_type.startswith("lops"): # paths are stored one per line
         words = text.split("\n")
