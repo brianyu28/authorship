@@ -15,7 +15,7 @@ import sys
 import tabulate
 import yaml
 
-import markov
+import hmm
 
 VERBOSE = False
 
@@ -259,7 +259,9 @@ class Runner():
         # Now guess the likely sequences.
         self.dataset.composite_predictions = []
         for composite in self.dataset.testing:
-            prediction = markov.predict_assignments(self.config.authors.keys(), [sentence.prediction for sentence in composite], self.config.accuracy)
+            model = hmm.Model(list(self.config.authors.keys()), [sentence.prediction for sentence in composite])
+            model.fit()
+            prediction = model.most_likely_states()
             self.dataset.composite_predictions.append(prediction)
             for i, sentence in enumerate(composite):
                 sentence.composite_prediction = prediction[i]
