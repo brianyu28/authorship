@@ -46,15 +46,15 @@ features_cpfws:
 features:
   - name: ngram
     length: 1
-    type: redacted
+    type: pos
     threshold: 5
   - name: ngram
     length: 2
-    type: redacted
+    type: pos
     threshold: 5
   - name: ngram
     length: 3
-    type: redacted
+    type: pos
     threshold: 5
 
 features_freq:

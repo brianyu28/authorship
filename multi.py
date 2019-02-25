@@ -378,10 +378,17 @@ class Runner():
 
         # Now guess the likely sequences.
         self.dataset.composite_predictions = []
+        self.dataset.composite_adj_predictions = []
         for composite in self.dataset.testing:
-            if not ADJACENCY:
-                model = hmm.Model(list(self.config.authors.keys()), [sentence.prediction for sentence in composite])
-            else:
+            model = hmm.Model(list(self.config.authors.keys()), [sentence.prediction for sentence in composite])
+            model.fit()
+            prediction = model.most_likely_states()
+            self.dataset.composite_predictions.append(prediction)
+            for i, sentence in enumerate(composite):
+                sentence.composite_prediction = prediction[i]
+
+            # If we used the adjacency model, add that prediction.
+            if ADJACENCY:
                 adjacencies = [None]
                 for i in range(len(composite) - 1):
                     predictions = []
@@ -391,27 +398,43 @@ class Runner():
                         predictions.append(prediction)
                     adjacencies.append(predictions)
                 model = hmm.Model(list(self.config.authors.keys()), [sentence.prediction for sentence in composite], adjacencies)
-            model.fit()
-            prediction = model.most_likely_states()
-            self.dataset.composite_predictions.append(prediction)
-            for i, sentence in enumerate(composite):
-                sentence.composite_prediction = prediction[i]
+                model.fit()
+                prediction = model.most_likely_states()
+                self.dataset.composite_adj_predictions.append(prediction)
+                for i, sentence in enumerate(composite):
+                    sentence.composite_adj_prediction = prediction[i]
 
     def print_results(self):
         (accurate, inaccurate) = (0, 0)
         (composite_accurate, composite_inaccurate) = (0, 0)
+        (composite_adj_accurate, composite_adj_inaccurate) = (0, 0)
         for i, composite in enumerate(self.dataset.testing):
             (c_accurate, c_inaccurate) = (0, 0)
             (c_composite_accurate, c_composite_inaccurate) = (0, 0)
+            (c_composite_adj_accurate, c_composite_adj_inaccurate) = (0, 0)
             print(f"COMPOSITE {i}")
             data = []
             for j, sentence in enumerate(composite):
-                data.append([sentence.identifier,
-                             sentence.author,
-                             sentence.prediction,
-                             sentence.composite_prediction,
-                             "Yes" if sentence.author == sentence.prediction else "No",
-                             "Yes" if sentence.author == sentence.composite_prediction else "No"])
+                if ADJACENCY:
+                    data.append([sentence.identifier,
+                                sentence.author,
+                                sentence.prediction,
+                                sentence.composite_prediction,
+                                sentence.composite_adj_prediction,
+                                "Yes" if sentence.author == sentence.prediction else "No",
+                                "Yes" if sentence.author == sentence.composite_prediction else "No",
+                                "Yes" if sentence.author == sentence.composite_adj_prediction else "No"])
+                    if sentence.author == sentence.composite_adj_prediction:
+                        c_composite_adj_accurate += 1
+                    else:
+                        c_composite_adj_inaccurate += 1
+                else:
+                    data.append([sentence.identifier,
+                                sentence.author,
+                                sentence.prediction,
+                                sentence.composite_prediction,
+                                "Yes" if sentence.author == sentence.prediction else "No",
+                                "Yes" if sentence.author == sentence.composite_prediction else "No"])
                 if sentence.author == sentence.prediction:
                     c_accurate += 1
                 else:
@@ -424,11 +447,19 @@ class Runner():
             inaccurate += c_inaccurate
             composite_accurate += c_composite_accurate
             composite_inaccurate += c_composite_inaccurate
-            print(tabulate.tabulate(data, headers=["Identifier", "Author", "Prediction", "Composite Prediction", "Accurate", "Composite Accurate"], tablefmt="psql"))
+            composite_adj_accurate += c_composite_adj_accurate
+            composite_adj_inaccurate += c_composite_adj_inaccurate
+            if not ADJACENCY:
+                print(tabulate.tabulate(data, headers=["Identifier", "Author", "Prediction", "Composite Prediction", "Accurate", "Composite Accurate"], tablefmt="psql"))
+            else:
+                print(tabulate.tabulate(data, headers=["Identifier", "Author", "Prediction", "Composite Pred", "Adj Pred", "Accurate", "Composite Right", "Adj Right"], tablefmt="psql"))
             accuracy = "{:.2f}%".format((c_accurate / (c_accurate + c_inaccurate)) * 100)
             composite_accuracy = "{:.2f}%".format((c_composite_accurate / (c_composite_accurate + c_composite_inaccurate)) * 100)
             print(f"Accuracy: {c_accurate} of {c_accurate + c_inaccurate} ({accuracy})")
             print(f"Composite Accuracy: {c_composite_accurate} of {c_composite_accurate + c_composite_inaccurate} ({composite_accuracy})")
+            if ADJACENCY:
+                composite_adj_accuracy = "{:.2f}%".format((c_composite_adj_accurate / (c_composite_adj_accurate + c_composite_adj_inaccurate)) * 100)
+                print(f"Composite Adjacent Accuracy: {c_composite_adj_accurate} of {c_composite_adj_accurate + c_composite_adj_inaccurate} ({composite_adj_accuracy})")
             print()
         print()
         print("OVERALL:")
@@ -436,7 +467,10 @@ class Runner():
         composite_accuracy = "{:.2f}%".format((composite_accurate / (composite_accurate + composite_inaccurate)) * 100)
         print(f"Overall Accuracy: {accurate} of {accurate + inaccurate} ({accuracy})")
         print(f"Overall Composite Accuracy: {composite_accurate} of {composite_accurate + composite_inaccurate} ({composite_accuracy})")
-        print(self.dataset.predictions)
+        if ADJACENCY:
+            composite_adj_accuracy = "{:.2f}%".format((composite_adj_accurate / (composite_adj_accurate + composite_adj_inaccurate)) * 100)
+            print(f"Overall Composite Adjacent Accuracy: {composite_adj_accurate} of {composite_adj_accurate + composite_adj_inaccurate} ({composite_adj_accuracy})")
+        # print(self.dataset.predictions)
 
     def mkdir(self, dirname):
         try:
