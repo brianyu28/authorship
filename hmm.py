@@ -112,7 +112,7 @@ class Model:
                 else:
                     prob_state = sum((Alpha[j][t-1] * A[j][i])
                                      if j != i else
-                                     (Alpha[j][t-1] * adjacencies[t])
+                                     (Alpha[j][t-1] * adjacencies[t][i])
                                      for j in range(N))
 
                 # Probability of emission of observed state.
@@ -136,7 +136,7 @@ class Model:
                 else:
                     Beta[i][t] = sum((Beta[j][t + 1] * A[i][j] * B[j][author[Y[t+1]]])
                                     if j != i else
-                                    (Beta[j][t + 1] * adjacencies[t+1] * B[j][author[Y[t+1]]])
+                                    (Beta[j][t + 1] * adjacencies[t+1][i] * B[j][author[Y[t+1]]])
                                     for j in range(N))
         return Alpha, Beta
 

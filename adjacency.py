@@ -7,7 +7,7 @@ from sklearn.linear_model import LogisticRegression
 
 class AdjacencyModel:
 
-    def __init__(self, non_adjacent, adjacent):
+    def __init__(self, adjacent, non_adjacent):
         x = [value for value in non_adjacent + adjacent]
         y = [False for _ in non_adjacent] + [True for _ in adjacent]
         reg = LogisticRegression()
@@ -16,6 +16,12 @@ class AdjacencyModel:
 
     def proba(self, observed):
         return self.reg.predict_proba([observed])[0][1]
+
+def score(text1, text2):
+    """
+    Score the similarity between two texts.
+    """
+    return word_similarity(text1, text2)
 
 def word_similarity(text1, text2):
     tokens1 = set(token.lower() for token in nltk.word_tokenize(text1) if any(c.isalpha() for c in token))

@@ -242,7 +242,8 @@ class Runner():
         """
 
         # Separate each author's sentences into sets of testing and training.
-        all_segments = {}
+        all_segments = dict()
+        self.training_segments = {author: [] for author in self.config.authors}
         for author in self.config.authors:
             self.log(f"Segmenting works of {author} into consecutive sentences...")
             author_identifier = self.config.authors[author]
@@ -271,6 +272,7 @@ class Runner():
             training = []
             while len(training) < self.config.training_threshold * num_identifiers:
                 segment = segments[0]
+                self.training_segments[author].append(segment)
                 segments = segments[1:]
                 for sentence in segment:
                     training.append(sentence)
@@ -319,6 +321,37 @@ class Runner():
 
             self.log(f"Generated document {doc_filename}...")
 
+        
+        # Now, train adjacency model on training data.
+        self.log(f"Training adjacency models...")
+        self.adj_models = dict()
+        for author in self.config.authors:
+            training_segments = self.training_segments[author]
+            adjacent = []
+            nonadjacent = []
+
+            # Keep track of used adjacent sentences, to avoid re-computing.
+            used = set()
+
+            # Take all adjacent sentences and identify score for each.
+            for segment in training_segments:
+                for i in range(len(segment) - 1):
+                    a, b = segment[i], segment[i + 1]
+                    used.add((a, b))
+                    score = adjacency.score(self.sentences[a].text, self.sentences[b].text)
+                    adjacent.append(score)
+
+            # Take a sampling of non-adjacent sentences, identifying score for each.
+            while len(nonadjacent) < len(adjacent):
+                a = random.choice(self.training[author])
+                b = random.choice(self.training[random.choice(all_authors)])
+                if a == b or (a.identifier, b.identifier) in used or (b.identifier, a.identifier) in used:
+                    continue
+                score = adjacency.score(a.text, b.text)
+                nonadjacent.append(score)
+
+            self.adj_models[author] = adjacency.AdjacencyModel(adjacent, nonadjacent)
+
     def prepare_dataset(self):
         self.log("Preparing dataset...")
 
@@ -346,7 +379,18 @@ class Runner():
         # Now guess the likely sequences.
         self.dataset.composite_predictions = []
         for composite in self.dataset.testing:
-            model = hmm.Model(list(self.config.authors.keys()), [sentence.prediction for sentence in composite])
+            if not ADJACENCY:
+                model = hmm.Model(list(self.config.authors.keys()), [sentence.prediction for sentence in composite])
+            else:
+                adjacencies = [None]
+                for i in range(len(composite) - 1):
+                    predictions = []
+                    for author in self.config.authors.keys():
+                        score = adjacency.score(composite[i].text, composite[i + 1].text)
+                        prediction = self.adj_models[author].proba(score)
+                        predictions.append(prediction)
+                    adjacencies.append(predictions)
+                model = hmm.Model(list(self.config.authors.keys()), [sentence.prediction for sentence in composite], adjacencies)
             model.fit()
             prediction = model.most_likely_states()
             self.dataset.composite_predictions.append(prediction)
