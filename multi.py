@@ -18,6 +18,7 @@ import yaml
 import hmm
 
 VERBOSE = False
+ADJACENCY = False # use adjacency tracking
 
 class Dataset():
     """

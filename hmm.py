@@ -1,5 +1,8 @@
 """
 Implementation of Baum Welch.
+Allows for a modification of Baum-Welch that breaks some of the assumptions
+of the Hidden Markov Model, by using a separate model to predict whether two
+sentences are adjacent to one another.
 """
 
 import numpy as np
@@ -100,7 +103,13 @@ class Model:
             for i in range(N):
 
                 # Sum over probabilities of all possible ways to get to state i.
-                prob_state = sum(Alpha[j][t-1] * A[j][i] for j in range(N))
+                if not self.use_adjacencies:
+                    prob_state = sum(Alpha[j][t-1] * A[j][i] for j in range(N))
+                else:
+                    prob_state = sum((Alpha[j][t-1] * A[j][i])
+                                     if j != i else
+                                     (Alpha[j][t-1] * adjacencies[t]
+                                     for j in range(N))
 
                 # Probability of emission of observed state.
                 prob_emission = B[i][author[Y[t]]]
@@ -117,8 +126,14 @@ class Model:
         # Recursively compute B[i][t] for t = T-2, ..., 0
         for t in range(T - 2, -1, -1):
             for i in range(N):
-                Beta[i][t] = sum(Beta[j][t + 1] * A[i][j] * B[j][author[Y[t+1]]]
-                                 for j in range(N))
+                if not self.use_adjacencies:
+                    Beta[i][t] = sum(Beta[j][t + 1] * A[i][j] * B[j][author[Y[t+1]]]
+                                    for j in range(N))
+                else:
+                    Beta[i][t] = sum((Beta[j][t + 1] * A[i][j] * B[j][author[Y[t+1]]])
+                                    if j != i else
+                                    (Beta[j][t + 1] * adjacencies[t+1] * B[j][author[Y[t+1]]])
+                                    for j in range(N))
         return Alpha, Beta
 
     def update(self, parameters, predictions, Alpha, Beta):
@@ -277,17 +292,3 @@ class Parameters:
         print()
         print()
 
-def main():
-    authors = ["Anne", "Emily", "Charlotte"]
-    predictions = [
-        "Anne", "Emily", "Emily", "Emily", "Anne", "Emily", "Charlotte",
-        "Charlotte", "Charlotte", "Charlotte", "Anne", "Charlotte", "Charlotte",
-        "Anne", "Anne", "Anne", "Emily", "Emily", "Anne", "Anne", "Anne", "Anne",
-        "Emily", "Emily", "Charlotte", "Emily", "Emily"]
-    model = Model(authors, predictions)
-    model.fit()
-    print(model.most_likely_states())
-
-
-if __name__ == "__main__":
-    main()
