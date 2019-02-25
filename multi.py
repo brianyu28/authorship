@@ -19,7 +19,7 @@ import adjacency
 import hmm
 
 VERBOSE = False
-ADJACENCY = False # use adjacency tracking
+ADJACENCY = True # use adjacency tracking
 
 class Dataset():
     """
@@ -242,20 +242,68 @@ class Runner():
         """
 
         # Separate each author's sentences into sets of testing and training.
+        all_segments = {}
         for author in self.config.authors:
+            self.log(f"Segmenting works of {author} into consecutive sentences...")
             author_identifier = self.config.authors[author]
             sentences = { sentence: self.sentences[sentence] for sentence in self.sentences if self.sentences[sentence].author == author }
             identifiers = list(sentences.keys())
+            num_identifiers = len(identifiers)
             identifiers.sort()
-            print(identifiers)
-            sys.exit(0)
+
+            # Take the identifiers, and pull them apart into segments.
+            segments = []
+            (MIN_SEGMENT, MAX_SEGMENT) = (4, 10)
+            while True:
+
+                # If we have MAX_SEGMENT or fewer sentences remaining, then use all sentences as the last segment.
+                if len(identifiers) <= MAX_SEGMENT:
+                    segments.append(identifiers[:])
+                    break
+
+                # Create a new segment of random length.
+                num_sentences = random.randint(MIN_SEGMENT, MAX_SEGMENT)
+                segments.append(identifiers[:num_sentences])
+                identifiers = identifiers[num_sentences:]
+            random.shuffle(segments)
+
+            # Pull training sentences until we get to the required threshold.
+            training = []
+            while len(training) < self.config.training_threshold * num_identifiers:
+                segment = segments[0]
+                segments = segments[1:]
+                for sentence in segment:
+                    training.append(sentence)
+            self.training[author] = [self.sentences[identifier] for identifier in training]
+
+            all_segments[author] = segments
+
+        self.mkdir(os.path.join(self.config.src, "composite"))
+        all_authors = list(self.config.authors.keys())
+        self.composites = []
 
         # Generate n documents.
         digits = math.ceil(math.log10(self.config.generate.n))
+        segments_per_document = sum(len(all_segments[author]) for author in all_authors) // self.config.generate.n
         for i in range(self.config.generate.n):
 
             document = []
             authors = []
+            composite = []
+
+            # Choose a random segment, add it to the document.
+            for j in range(segments_per_document):
+                available_authors = [author for author in all_authors if len(all_segments[author])]
+                choice = random.choice(available_authors)
+                segment = all_segments[choice][0]
+                all_segments[choice] = all_segments[choice][1:]
+                for identifier in segment:
+                    sentence = self.sentences[identifier]
+                    document.append(sentence.text)
+                    authors.append(choice)
+                    composite.append(sentence)
+            
+            self.composites.append(composite)
 
             # Write document to file.
             doc_filename = os.path.join(self.config.src, "composite", f"{str(i).zfill(digits)}_doc.txt")
@@ -270,7 +318,6 @@ class Runner():
                     f.write("\n")
 
             self.log(f"Generated document {doc_filename}...")
-        # TODO
 
     def prepare_dataset(self):
         self.log("Preparing dataset...")

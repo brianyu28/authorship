@@ -66,7 +66,8 @@ class Model:
         # Loop until convergence.
         iterations = 0
         while True:
-            print(f"Baum-Welch estimation, iteration {iterations}...")
+            if iterations % 100 == 0:
+                print(f"Baum-Welch estimation, iteration {iterations}...")
             iterations += 1
             Alpha, Beta = self.forward_backward(parameters, self.Y, self.adjacencies)
             new_parameters = self.update(parameters, self.Y, Alpha, Beta)
@@ -240,14 +241,14 @@ class Parameters:
 
         # Randomly generate transition probabilities.
         for i in range(N):
-            raw = [random.random() for _ in range(N)]
+            raw = [0.25 + (random.random() / 2) for _ in range(N)]
             normalized = [x / sum(raw) for x in raw]
             for j in range(N):
                 self.A[i][j] = normalized[j]
 
         # Generate emission probabilities using heuristic, assume about 0.6 right.
         for i in range(N):
-            raw = [3 if i == k else 1 for k in range(N)]
+            raw = [2 if i == k else 1 for k in range(N)]
             normalized = [x / sum(raw) for x in raw]
             for j in range(N):
                 self.B[i][j] = normalized[j]
