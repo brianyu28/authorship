@@ -5,3 +5,5 @@ data/*/segments
 data/*/separations
 data/*/composite
 data/*/sentences*
+data/*/adj_sentences*
+*.swp

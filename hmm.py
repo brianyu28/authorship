@@ -64,7 +64,10 @@ class Model:
         parameters.randomize()
 
         # Loop until convergence.
-        for i in range(50):
+        iterations = 0
+        while True:
+            print(f"Baum-Welch estimation, iteration {iterations}...")
+            iterations += 1
             Alpha, Beta = self.forward_backward(parameters, self.Y, self.adjacencies)
             new_parameters = self.update(parameters, self.Y, Alpha, Beta)
             distance = parameters.distance_from(new_parameters)
@@ -108,7 +111,7 @@ class Model:
                 else:
                     prob_state = sum((Alpha[j][t-1] * A[j][i])
                                      if j != i else
-                                     (Alpha[j][t-1] * adjacencies[t]
+                                     (Alpha[j][t-1] * adjacencies[t])
                                      for j in range(N))
 
                 # Probability of emission of observed state.

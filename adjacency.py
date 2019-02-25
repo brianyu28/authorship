@@ -2,6 +2,7 @@
 Regression model to handle adjacency.
 """
 
+import nltk
 from sklearn.linear_model import LogisticRegression
 
 class AdjacencyModel:
@@ -15,3 +16,8 @@ class AdjacencyModel:
 
     def proba(self, observed):
         return self.reg.predict_proba([observed])[0][1]
+
+def word_similarity(text1, text2):
+    tokens1 = set(token.lower() for token in nltk.word_tokenize(text1) if any(c.isalpha() for c in token))
+    tokens2 = set(token.lower() for token in nltk.word_tokenize(text2) if any (c.isalpha() for c in token))
+    return [len(tokens1.intersection(tokens2)) / len(tokens1.union(tokens2))]

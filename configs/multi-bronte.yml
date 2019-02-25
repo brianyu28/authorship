@@ -7,7 +7,7 @@ configuration:
     - preprocessing
   clean:
     - composite
-  sentence_dir: sentences1
+  sentence_dir: adj_sentences1
 
 authors:
   Anne Bronte: anne

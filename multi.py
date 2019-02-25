@@ -15,6 +15,7 @@ import sys
 import tabulate
 import yaml
 
+import adjacency
 import hmm
 
 VERBOSE = False
@@ -157,14 +158,15 @@ class Runner():
                 self.sentences[identifier] = sentence
 
     def generate(self):
-
-        def random_choice(authors):
-            """Picks a random author, using a non-uniform distribution."""
-            probabilities = []
-            for i in authors:
-                probabilities.append(random.randint(1, 10))
-            probabilities = [x / sum(probabilities) for x in probabilities]
-            return np.random.choice(authors, p=probabilities)
+        if ADJACENCY:
+            self.generate_adjacent()
+        else:
+            self.generate_random()
+        
+    def generate_random(self):
+        """
+        Generates documents using random sentences.
+        """
 
         # Process sentences.
         sentences = dict()
@@ -191,7 +193,7 @@ class Runner():
             document = []
             authors = []
             composite = []
-            author = random_choice(all_authors)
+            author = random.choice(all_authors)
             while True:
 
                 action = np.random.choice(["STAY", "NEXT", "TERMINATE"],
@@ -232,6 +234,43 @@ class Runner():
                     f.write("\n")
 
             self.log(f"Generated document {doc_filename}...")
+
+    def generate_adjacent(self):
+        """
+        Generate documents consisting of adjacent sentences.
+        Also trains and prepares adjacency model.
+        """
+
+        # Separate each author's sentences into sets of testing and training.
+        for author in self.config.authors:
+            author_identifier = self.config.authors[author]
+            sentences = { sentence: self.sentences[sentence] for sentence in self.sentences if self.sentences[sentence].author == author }
+            identifiers = list(sentences.keys())
+            identifiers.sort()
+            print(identifiers)
+            sys.exit(0)
+
+        # Generate n documents.
+        digits = math.ceil(math.log10(self.config.generate.n))
+        for i in range(self.config.generate.n):
+
+            document = []
+            authors = []
+
+            # Write document to file.
+            doc_filename = os.path.join(self.config.src, "composite", f"{str(i).zfill(digits)}_doc.txt")
+            author_filename = os.path.join(self.config.src, "composite", f"{str(i).zfill(digits)}_authors.txt")
+            with open(doc_filename, "w") as f:
+                for path in document:
+                    f.write(path)
+                    f.write("\n")
+            with open(author_filename, "w") as f:
+                for author in authors:
+                    f.write(author)
+                    f.write("\n")
+
+            self.log(f"Generated document {doc_filename}...")
+        # TODO
 
     def prepare_dataset(self):
         self.log("Preparing dataset...")
