@@ -7,7 +7,7 @@ configuration:
     - preprocessing
   clean:
     - composite
-  sentence_dir: adj_sentences1
+  sentence_dir: adj_sentences9
 
 authors:
   Anne Bronte: anne
@@ -23,7 +23,7 @@ corpus:
     author: Emily Bronte
 
 generate:
-  n: 10
+  n: 5
   stay: 0.95
   terminate: 0.01
   threshold: 50 # sentence threshold
@@ -46,15 +46,15 @@ features_cpfws:
 features:
   - name: ngram
     length: 1
-    type: pos
+    type: redacted
     threshold: 5
   - name: ngram
     length: 2
-    type: pos
+    type: redacted
     threshold: 5
   - name: ngram
     length: 3
-    type: pos
+    type: redacted
     threshold: 5
 
 features_freq:
